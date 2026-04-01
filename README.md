@@ -33,14 +33,16 @@ Root gerektirmez, basit ve etkili. EasyTether'ın açık kaynak alternatifi.
 
 ### Android Tarafı
 
-1. **APK'yı İndirin ve Yükleyin**
+1. **APK'yı İndirin**
 ```bash
-# Build APK
-cd EasyShareNet/android
-./gradlew assembleRelease
+# GitHub Releases'dan indir (yakında)
+# Veya kendin build et:
+git clone https://github.com/yusufyusufyusuf474734-collab/internet.git
+cd internet/android
+gradle assembleRelease
 
 # Telefona yükle
-adb install app/build/outputs/apk/release/app-release.apk
+adb install app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
 2. **USB Debugging Açın**
@@ -52,12 +54,15 @@ Ayarlar → Geliştirici Seçenekleri → USB Debugging (Aç)
 ### Linux Tarafı (Arch)
 
 ```bash
-# AUR'dan kur
-yay -S easysharenet
-
-# Veya manuel kur
-cd EasyShareNet/linux/PKGBUILD
+# Manuel kurulum (Önerilen)
+git clone https://github.com/yusufyusufyusuf474734-collab/internet.git
+cd internet/linux/PKGBUILD
 makepkg -si
+
+# Veya direkt script kurulumu
+sudo curl -o /usr/local/bin/easysharenet-connect \
+  https://raw.githubusercontent.com/yusufyusufyusuf474734-collab/internet/main/linux/scripts/easysharenet-connect
+sudo chmod +x /usr/local/bin/easysharenet-connect
 ```
 
 ### Diğer Linux Dağıtımları
@@ -66,9 +71,11 @@ makepkg -si
 # Bağımlılıkları kur
 sudo apt install android-tools-adb redsocks iptables netcat  # Debian/Ubuntu
 sudo dnf install android-tools redsocks iptables nmap-ncat   # Fedora
+sudo pacman -S android-tools redsocks iptables openbsd-netcat # Arch
 
-# Script'i kopyala
-sudo cp EasyShareNet/linux/scripts/easysharenet-connect /usr/local/bin/
+# Script'i kur
+sudo curl -o /usr/local/bin/easysharenet-connect \
+  https://raw.githubusercontent.com/yusufyusufyusuf474734-collab/internet/main/linux/scripts/easysharenet-connect
 sudo chmod +x /usr/local/bin/easysharenet-connect
 ```
 

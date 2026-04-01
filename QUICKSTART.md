@@ -16,12 +16,7 @@ Ayarlar → Geliştirici Seçenekleri → USB Debugging ✅
 
 ## 💻 2. Linux Kurulum (2 dakika)
 
-### Arch Linux
-```bash
-yay -S easysharenet
-```
-
-### Diğer Dağıtımlar
+### Hızlı Kurulum (Tüm Dağıtımlar)
 ```bash
 # Bağımlılıkları kur
 sudo pacman -S android-tools redsocks iptables openbsd-netcat  # Arch
@@ -30,8 +25,15 @@ sudo dnf install android-tools redsocks iptables nmap-ncat     # Fedora
 
 # Script'i kur
 sudo curl -o /usr/local/bin/easysharenet-connect \
-  https://raw.githubusercontent.com/easysharenet/easysharenet/main/linux/scripts/easysharenet-connect
+  https://raw.githubusercontent.com/yusufyusufyusuf474734-collab/internet/main/linux/scripts/easysharenet-connect
 sudo chmod +x /usr/local/bin/easysharenet-connect
+```
+
+### Arch Linux (PKGBUILD ile)
+```bash
+git clone https://github.com/yusufyusufyusuf474734-collab/internet.git
+cd internet/linux/PKGBUILD
+makepkg -si
 ```
 
 ## 🚀 3. Kullan! (1 dakika)
