@@ -7,12 +7,11 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import io.ktor.network.selector.*
-import io.ktor.network.sockets.*
-import io.ktor.utils.io.*
 import kotlinx.coroutines.*
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
+import java.io.InputStream
+import java.io.OutputStream
+import java.net.ServerSocket
+import java.net.Socket
 
 class ProxyService : Service() {
     
@@ -42,103 +41,84 @@ class ProxyService : Service() {
         return START_STICKY
     }
     
-    private suspend fun startProxyServer() {
-        val selectorManager = SelectorManager(Dispatchers.IO)
-        
-        serverSocket = aSocket(selectorManager)
-            .tcp()
-            .bind(InetSocketAddress("127.0.0.1", PROXY_PORT))
-        
+    private suspend fun startProxyServer() = withContext(Dispatchers.IO) {
+        serverSocket = ServerSocket(PROXY_PORT)
         updateNotification("Çalışıyor - Port: $PROXY_PORT")
         
         while (true) {
-            val clientSocket = serverSocket?.accept() ?: break
-            
-            serviceScope.launch {
-                handleClient(clientSocket)
+            try {
+                val clientSocket = serverSocket?.accept() ?: break
+                serviceScope.launch {
+                    handleClient(clientSocket)
+                }
+            } catch (e: Exception) {
+                break
             }
         }
     }
     
-    private suspend fun handleClient(clientSocket: Socket) {
+    private suspend fun handleClient(clientSocket: Socket) = withContext(Dispatchers.IO) {
         try {
-            val input = clientSocket.openReadChannel()
-            val output = clientSocket.openWriteChannel(autoFlush = true)
+            val input = clientSocket.getInputStream()
+            val output = clientSocket.getOutputStream()
             
-            // SOCKS5 handshake
-            val version = input.readByte()
-            if (version.toInt() != 5) {
+            val version = input.read()
+            if (version != 5) {
                 clientSocket.close()
-                return
+                return@withContext
             }
             
-            val nmethods = input.readByte()
-            val methods = ByteArray(nmethods.toInt())
-            input.readFully(methods, 0, nmethods.toInt())
+            val nmethods = input.read()
+            input.skip(nmethods.toLong())
             
-            // No authentication
-            output.writeByte(5)
-            output.writeByte(0)
+            output.write(byteArrayOf(5, 0))
             output.flush()
             
-            // Read request
-            val ver = input.readByte()
-            val cmd = input.readByte()
-            val rsv = input.readByte()
-            val atyp = input.readByte()
+            input.read()
+            val cmd = input.read()
+            input.read()
+            val atyp = input.read()
             
-            if (cmd.toInt() != 1) { // Only CONNECT supported
+            if (cmd != 1) {
                 sendSocks5Error(output, 7)
                 clientSocket.close()
-                return
+                return@withContext
             }
             
-            // Parse destination
-            val destAddr = when (atyp.toInt()) {
-                1 -> { // IPv4
+            val destAddr = when (atyp) {
+                1 -> {
                     val addr = ByteArray(4)
-                    input.readFully(addr, 0, 4)
+                    input.read(addr)
                     addr.joinToString(".") { (it.toInt() and 0xFF).toString() }
                 }
-                3 -> { // Domain
-                    val len = input.readByte().toInt()
+                3 -> {
+                    val len = input.read()
                     val domain = ByteArray(len)
-                    input.readFully(domain, 0, len)
+                    input.read(domain)
                     String(domain)
                 }
                 else -> {
                     sendSocks5Error(output, 8)
                     clientSocket.close()
-                    return
+                    return@withContext
                 }
             }
             
-            val destPort = ((input.readByte().toInt() and 0xFF) shl 8) or 
-                          (input.readByte().toInt() and 0xFF)
+            val destPort = (input.read() shl 8) or input.read()
             
-            // Connect to destination
             val destSocket = try {
-                aSocket(SelectorManager(Dispatchers.IO))
-                    .tcp()
-                    .connect(InetSocketAddress(destAddr, destPort))
+                Socket(destAddr, destPort)
             } catch (e: Exception) {
                 sendSocks5Error(output, 1)
                 clientSocket.close()
-                return
+                return@withContext
             }
             
-            // Send success response
-            output.writeByte(5)
-            output.writeByte(0)
-            output.writeByte(0)
-            output.writeByte(1)
-            output.writeInt(0) // Bind address
-            output.writeShort(0) // Bind port
+            output.write(byteArrayOf(5, 0, 0, 1, 0, 0, 0, 0, 0, 0))
             output.flush()
             
-            // Relay data
-            val destInput = destSocket.openReadChannel()
-            val destOutput = destSocket.openWriteChannel(autoFlush = true)
+            val destInput = destSocket.getInputStream()
+            val destOutput = destSocket.getOutputStream()
             
             coroutineScope {
                 launch { relay(input, destOutput) }
@@ -150,33 +130,25 @@ class ProxyService : Service() {
             
         } catch (e: Exception) {
             e.printStackTrace()
-            clientSocket.close()
+            try { clientSocket.close() } catch (_: Exception) {}
         }
     }
     
-    private suspend fun relay(input: ByteReadChannel, output: ByteWriteChannel) {
+    private suspend fun relay(input: InputStream, output: OutputStream) = withContext(Dispatchers.IO) {
         try {
-            val buffer = ByteBuffer.allocate(8192)
-            while (!input.isClosedForRead) {
-                buffer.clear()
-                val count = input.readAvailable(buffer)
+            val buffer = ByteArray(8192)
+            while (true) {
+                val count = input.read(buffer)
                 if (count == -1) break
-                buffer.flip()
-                output.writeFully(buffer)
+                output.write(buffer, 0, count)
                 output.flush()
             }
         } catch (e: Exception) {
-            // Connection closed
         }
     }
     
-    private suspend fun sendSocks5Error(output: ByteWriteChannel, errorCode: Int) {
-        output.writeByte(5)
-        output.writeByte(errorCode)
-        output.writeByte(0)
-        output.writeByte(1)
-        output.writeInt(0)
-        output.writeShort(0)
+    private fun sendSocks5Error(output: OutputStream, errorCode: Int) {
+        output.write(byteArrayOf(5, errorCode.toByte(), 0, 1, 0, 0, 0, 0, 0, 0))
         output.flush()
     }
     
@@ -207,7 +179,7 @@ class ProxyService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
-        serverSocket?.close()
+        try { serverSocket?.close() } catch (_: Exception) {}
     }
     
     override fun onBind(intent: Intent?): IBinder? = null
