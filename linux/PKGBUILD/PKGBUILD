@@ -1,0 +1,52 @@
+# Maintainer: EasyShareNet Team
+pkgname=easysharenet
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="USB Tethering bypass tool - Operatör hotspot kısıtlamalarını aşar"
+arch=('any')
+url="https://github.com/easysharenet/easysharenet"
+license=('GPL3')
+depends=('android-tools' 'redsocks' 'iptables' 'openbsd-netcat')
+optdepends=('android-udev: USB bağlantı kuralları')
+source=("easysharenet-connect")
+sha256sums=('SKIP')
+
+package() {
+    # Script'i kur
+    install -Dm755 "$srcdir/easysharenet-connect" "$pkgdir/usr/bin/easysharenet-connect"
+    
+    # Udev kuralları
+    install -Dm644 /dev/stdin "$pkgdir/etc/udev/rules.d/51-easysharenet.rules" << EOF
+# EasyShareNet USB Rules
+SUBSYSTEM=="usb", ATTR{idVendor}=="*", MODE="0666", GROUP="plugdev"
+EOF
+    
+    # Dokümantasyon
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/doc/$pkgname/README.md" << EOF
+# EasyShareNet
+
+## Kurulum
+\`\`\`bash
+yay -S easysharenet
+\`\`\`
+
+## Kullanım
+1. Android uygulamasını yükleyin
+2. USB debugging açın
+3. Telefonu bağlayın
+4. Uygulamayı başlatın
+5. Linux'ta çalıştırın:
+\`\`\`bash
+sudo easysharenet-connect
+\`\`\`
+
+## Sorun Giderme
+- USB debugging: Ayarlar → Geliştirici Seçenekleri
+- ADB yetkilendirme: Telefonda onaylayın
+- Port çakışması: 1080 portunu kontrol edin
+
+## Yasal Uyarı
+Bu yazılım eğitim amaçlıdır. Operatör sözleşmelerini ihlal edebilir.
+Kullanım sorumluluğu kullanıcıya aittir.
+EOF
+}
