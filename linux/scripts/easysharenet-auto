@@ -1,0 +1,145 @@
+#!/bin/bash
+
+# EasyShareNet - Otomatik Sistem Geneli Proxy
+# Tüm uygulamalar otomatik olarak proxy kullanır
+
+set -e
+
+PROXY_PORT=1080
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+echo -e "${BLUE}╔════════════════════════════════════╗${NC}"
+echo -e "${BLUE}║   EasyShareNet Auto Connector      ║${NC}"
+echo -e "${BLUE}╚════════════════════════════════════╝${NC}"
+echo ""
+
+# ADB path
+export PATH="/opt/android-sdk/platform-tools:$PATH"
+
+# ADB kontrolü
+if ! command -v adb &> /dev/null; then
+    echo -e "${RED}❌ ADB bulunamadı!${NC}"
+    exit 1
+fi
+
+# Telefon kontrolü
+echo -e "${YELLOW}📱 Telefon kontrol ediliyor...${NC}"
+DEVICE=$(adb devices | grep -w "device" | awk '{print $1}')
+
+if [ -z "$DEVICE" ]; then
+    echo -e "${RED}❌ Telefon bulunamadı!${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Telefon bulundu${NC}"
+
+# Uygulama kontrolü
+if ! adb shell pm list packages | grep -q "com.easysharenet"; then
+    echo -e "${RED}❌ EasyShareNet uygulaması yüklü değil!${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Uygulama yüklü${NC}"
+
+# Port forwarding
+echo -e "${YELLOW}🔌 Port forwarding...${NC}"
+adb forward tcp:$PROXY_PORT tcp:$PROXY_PORT
+echo -e "${GREEN}✓ Port forwarding aktif${NC}"
+
+# Proxy test
+sleep 2
+if ! timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/$PROXY_PORT" 2>/dev/null; then
+    echo -e "${RED}❌ Proxy çalışmıyor! Android uygulamasını başlat.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Proxy çalışıyor${NC}"
+
+# Sistem geneli proxy ayarları
+echo -e "${YELLOW}🌐 Sistem proxy ayarlanıyor...${NC}"
+
+# Environment variables
+export http_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export https_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export ftp_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export all_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export HTTP_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+export HTTPS_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+export FTP_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+export ALL_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+
+# Tüm kullanıcılar için environment
+cat > /etc/profile.d/easysharenet.sh << EOF
+export http_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export https_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export ftp_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export all_proxy="socks5://127.0.0.1:$PROXY_PORT"
+export HTTP_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+export HTTPS_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+export FTP_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+export ALL_PROXY="socks5://127.0.0.1:$PROXY_PORT"
+EOF
+
+chmod +x /etc/profile.d/easysharenet.sh
+
+# Git proxy
+git config --global http.proxy "socks5://127.0.0.1:$PROXY_PORT"
+git config --global https.proxy "socks5://127.0.0.1:$PROXY_PORT"
+
+echo -e "${GREEN}✓ Sistem proxy ayarlandı${NC}"
+
+echo ""
+echo -e "${GREEN}╔════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║   ✓ Bağlantı Başarılı!             ║${NC}"
+echo -e "${GREEN}╚════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${BLUE}📊 Durum:${NC}"
+echo -e "  Proxy: ${GREEN}SOCKS5://127.0.0.1:$PROXY_PORT${NC}"
+echo -e "  Sistem: ${GREEN}Otomatik${NC}"
+echo ""
+echo -e "${BLUE}✅ Artık tüm uygulamalar proxy kullanıyor!${NC}"
+echo ""
+echo -e "${YELLOW}Test et:${NC}"
+echo "  curl https://ifconfig.me"
+echo "  firefox (otomatik proxy)"
+echo "  chromium (otomatik proxy)"
+echo ""
+echo -e "${YELLOW}⚠️  Durdurmak için: Ctrl+C${NC}"
+echo ""
+
+# Cleanup
+cleanup() {
+    echo ""
+    echo -e "${YELLOW}🛑 Temizleniyor...${NC}"
+    
+    # Environment temizle
+    rm -f /etc/profile.d/easysharenet.sh
+    
+    # Git proxy temizle
+    git config --global --unset http.proxy 2>/dev/null || true
+    git config --global --unset https.proxy 2>/dev/null || true
+    
+    # ADB forward temizle
+    adb forward --remove tcp:$PROXY_PORT 2>/dev/null || true
+    
+    echo -e "${GREEN}✓ Temizlik tamamlandı${NC}"
+    echo -e "${YELLOW}Yeni terminal açarsan proxy kalkacak${NC}"
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+# Bağlantı izle
+echo -e "${BLUE}🔄 Bağlantı aktif... (Ctrl+C ile çık)${NC}"
+while true; do
+    if ! timeout 2 bash -c "echo > /dev/tcp/127.0.0.1/$PROXY_PORT" 2>/dev/null; then
+        echo -e "${RED}❌ Bağlantı kesildi!${NC}"
+        cleanup
+    fi
+    sleep 5
+done

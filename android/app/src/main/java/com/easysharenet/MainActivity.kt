@@ -23,6 +23,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // Otomatik başlat
+        if (!isRunning) {
+            startForegroundService(Intent(this, ProxyService::class.java))
+            isRunning = true
+        }
+        
         setContent {
             MaterialTheme {
                 MainScreen(
