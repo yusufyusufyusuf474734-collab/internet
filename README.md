@@ -1,5 +1,10 @@
 # 🌐 EasyShareNet
 
+[![Android Build](https://github.com/yusufyusufyusuf474734-collab/internet/actions/workflows/android-build.yml/badge.svg)](https://github.com/yusufyusufyusuf474734-collab/internet/actions/workflows/android-build.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Platform](https://img.shields.io/badge/Platform-Android%207.0%2B-green.svg)](https://www.android.com)
+[![Arch Linux](https://img.shields.io/badge/Arch-Linux-1793D1?logo=arch-linux&logoColor=fff)](https://archlinux.org)
+
 **Operatör hotspot kısıtlamalarını bypass eden USB tethering uygulaması**
 
 Root gerektirmez, basit ve etkili. EasyTether'ın açık kaynak alternatifi.
